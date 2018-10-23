@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <script src="https://aframe.io/releases/0.8.0/aframe.min.js"></script>
+    <script src="https://jeromeetienne.github.io/AR.js/aframe/build/aframe-ar.js"></script>
+    <script src="https://rawgit.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
+    <script src="https://unpkg.com/aframe-particle-system-component@1.0.x/dist/aframe-particle-system-component.min.js"></script>
+    <script src="aframe-sprite-particles-component.js"></script>
+    <script src="index.js"></script>
+  </head>
+  
+  
+  <body style="margin : 0px; overflow: hidden;">
+  <script id="custom-vertex-shader" type="x-shader/x-vertex">
+     #define LAMBERT
+
+varying vec3 vLightFront;
+
+uniform float time;
+uniform float glitch;
+
+#ifdef DOUBLE_SIDED
+
+	varying vec3 vLightBack;
+
+#endif
+
+#include <common>
+#include <uv_pars_vertex>
+#include <uv2_pars_vertex>
+#include <envmap_pars_vertex>
+#include <bsdfs>
+#include <lights_pars>
+#include <color_pars_vertex>
+#include <fog_pars_vertex>
+#include <morphtarget_pars_vertex>
+#include <skinning_pars_vertex>
+#include <shadowmap_pars_vertex>
+#include <logdepthbuf_pars_vertex>
+#include <clipping_planes_pars_vertex>
+
+void main() {
+
+	#include <uv_vertex>
+	#include <uv2_vertex>
+	#include <color_vertex>
+
+	#include <beginnormal_vertex>
+	#include <morphnormal_vertex>
+	#include <skinbase_vertex>
+	#include <skinnormal_vertex>
+	#include <defaultnormal_vertex>
+
+	#include <begin_vertex>
+	#include <morphtarget_vertex>
+	#include <skinning_vertex>
+	#include <project_vertex>
+  
+  float r = rand(vec2(gl_Position.y, 0.0));
+  
+  gl_Position.x += sin(glitch) * r * .15 * (gl_Position.z/3.0);
+  
+	#include <logdepthbuf_vertex>
+	#include <clipping_planes_vertex>
+
+	#include <worldpos_vertex>
+	#include <envmap_vertex>
+	#include <lights_lambert_vertex>
+	#include <shadowmap_vertex>
+	#include <fog_vertex>
+
+}
+    </script>   
+    
+    <script id="custom-fragment-shader" type="x-shader/x-fragment">
+    uniform vec3 diffuse;
+uniform vec3 emissive;
+uniform float opacity;
+
+uniform float time;
+uniform float glitch;
+
+varying vec3 vLightFront;
+
+#ifdef DOUBLE_SIDED
+
+	varying vec3 vLightBack;
+
+#endif
+
+#include <common>
+#include <packing>
+#include <dithering_pars_fragment>
+#include <color_pars_fragment>
+#include <uv_pars_fragment>
+#include <uv2_pars_fragment>
+#include <map_pars_fragment>
+#include <alphamap_pars_fragment>
+#include <aomap_pars_fragment>
+#include <lightmap_pars_fragment>
+#include <emissivemap_pars_fragment>
+#include <envmap_pars_fragment>
+#include <bsdfs>
+#include <lights_pars>
+#include <fog_pars_fragment>
+#include <shadowmap_pars_fragment>
+#include <shadowmask_pars_fragment>
+#include <specularmap_pars_fragment>
+#include <logdepthbuf_pars_fragment>
+#include <clipping_planes_pars_fragment>
+
+void main() {
+
+	#include <clipping_planes_fragment>
+  
+	vec4 diffuseColor = vec4( diffuse, opacity );
+	ReflectedLight reflectedLight = ReflectedLight( vec3( 0.0 ), vec3( 0.0 ), vec3( 0.0 ), vec3( 0.0 ) );
+	vec3 totalEmissiveRadiance = emissive;
+
+	#include <logdepthbuf_fragment>
+	#include <map_fragment>
+	#include <color_fragment>
+	#include <alphamap_fragment>
+	#include <alphatest_fragment>
+	#include <specularmap_fragment>
+	#include <emissivemap_fragment>
+
+	// accumulation
+	reflectedLight.indirectDiffuse = getAmbientLightIrradiance( ambientLightColor );
+
+	#include <lightmap_fragment>
+
+	reflectedLight.indirectDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb );
+
+	#ifdef DOUBLE_SIDED
+
+		reflectedLight.directDiffuse = ( gl_FrontFacing ) ? vLightFront : vLightBack;
+
+	#else
+
+		reflectedLight.directDiffuse = vLightFront;
+
+	#endif
+
+	reflectedLight.directDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb ) * getShadowMask();
+
+	// modulation
+	#include <aomap_fragment>
+
+	vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance/6.0;
+
+	#include <envmap_fragment>
+
+  diffuseColor.a = clamp(length(outgoingLight) - .5, 0.0, 1.0);
+	gl_FragColor = vec4( outgoingLight, diffuseColor.a );
+
+	#include <tonemapping_fragment>
+	#include <encodings_fragment>
+	#include <fog_fragment>
+	#include <premultiplied_alpha_fragment>
+	#include <dithering_fragment>
+
+}
+    </script>
+    
+  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false" loaded="main scene">
+    <!-- create your content here. just a box for now -->
+    <a-assets>
+      <a-asset-item id="alert" src="https://raw.githubusercontent.com/funsworkings/skeleton-livestream/master/ar.js%20assets/new%20dogs%20fixed%20mouths/DobermanAlert_Final_03_JL_newxr03.gltf">
+        </a-asset-item>
+      <a-asset-item id="turn" src="https://raw.githubusercontent.com/funsworkings/skeleton-livestream/master/ar.js%20assets/new%20dogs%20fixed%20mouths/DobermanTurn_Final_03_JL_newxr03.gltf">
+        </a-asset-item>
+      <a-asset-item id="snarl" src="https://raw.githubusercontent.com/funsworkings/skeleton-livestream/master/ar.js%20assets/new%20dogs%20fixed%20mouths/DobermanSnarl_Final_03_JL_newxr03.gltf">
+        </a-asset-item>
+      <a-asset-item id="bite" src="https://raw.githubusercontent.com/funsworkings/skeleton-livestream/master/ar.js%20assets/new%20dogs%20fixed%20mouths/DobermanBite_Final_02_JL_arxref02.gltf">
+        </a-asset-item>
+      </a-assets>
+    	
+     <a-marker-camera preset= "custom" type="pattern" url= "https://raw.githubusercontent.com/funsworkings/skeleton-livestream/master/ar.js%20assets/pattern-marker.patt">
+       <a-light type="ambient" position = "0 0 0" color="#4d88ff" intensity="10"></a-light>
+       
+       <a-entity id = "back_target"
+                  gltf-model="#alert" 
+                  position="0 0 0"
+                  scale=".02 .02 .02"
+                  
+                  
+                  holographic="frontfacing: false"
+                  animation-mixer="clip: *; loop: pingpong; timeScale: 1"
+                  animation-switcher="delayTime:0; transitionTime:1000; animDurations: 8000, 3600, 7840, 2000; second: false">
+        </a-entity>
+       <a-entity id = "target"
+                  gltf-model="#alert" 
+                  position="0 0 0"
+                  scale=".02 .02 .02"
+                  
+                  binary="boneTargets: doberman_REF_LoP_03__chest, doberman_REF_LoP_03__hip, doberman_REF_LoP_03__head"
+                  holographic="frontfacing: true"
+                  animation-mixer="clip: *; loop: pingpong; timeScale: 1"
+                  animation-switcher="delayTime:0; transitionTime:1000; animDurations: 8000, 3600, 7840, 2000; second: true">
+        </a-entity>
+       
+       <a-entity id = "ps0" tethered></a-entity>
+       <a-entity id = "ps1" tethered></a-entity>
+       <a-entity id = "ps2" tethered></a-entity>
+       
+       <a-entity position="0 0 0" scale=".02 .02 .02" sprite-particles="texture: https://cdn.glitch.com/1fa80e72-4da3-4c0c-8513-3dce564580b5%2Fnumber_0.png?1539798162835; color: #b3d9fc; 
+          lifeTime: .5..1; opacity: 0,1,1,0; position: -.25 -.25 -.25.. .25 .25 .25; velocity: -35 -35 -35.. 35 35 35; particleSize:25; source: #ps0; drag: .85; spawnRate: 60; blending: additive">
+        </a-entity>
+       <a-entity position="0 0 0" scale=".02 .02 .02" sprite-particles="texture: https://cdn.glitch.com/8d2af98c-d984-4dc9-99a3-b566d1518adb%2F1fa80e72-4da3-4c0c-8513-3dce564580b5-number_1.png?1539814733248; #b3d9fc; 
+          lifeTime: .5..1; opacity: 0,1,1,0; position: -.25 -.25 -.25.. .25 .25 .25; velocity: -35 -35 -35.. 35 35 35; particleSize:20; source: #ps1; drag: .85; spawnRate: 25; blending: additive">
+         </a-entity>
+        <a-entity position="0 0 0" scale=".02 .02 .02" sprite-particles="texture: https://cdn.glitch.com/1fa80e72-4da3-4c0c-8513-3dce564580b5%2Fnumber_0.png?1539798162835; color: #e8fbff; 
+          lifeTime: .5..1; opacity: 0,1,1,0; position: -.25 -.25 -.25.. .25 .25 .25; velocity: -35 -35 -35.. 35 35 35; particleSize:25; source: #ps2; drag: .85; spawnRate: 25; blending: additive">
+        </a-entity>
+       </a-marker-camera>
+  </a-scene>
+</body>
+</html>
+
+
